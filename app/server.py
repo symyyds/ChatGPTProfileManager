@@ -151,7 +151,7 @@ def list_profiles() -> list[dict]:
     for path in PROFILE_ROOT.iterdir():
         if path.is_dir():
             records.append(profile_record(path))
-    records.sort(key=lambda item: natural_key(item["name"]))
+    records.sort(key=lambda item: (int(item.get("createdAt") or 0), natural_key(item["name"])), reverse=True)
     return records
 
 
@@ -335,7 +335,16 @@ def update_profile(name: str, updates: dict) -> dict:
             meta[key] = str(updates.get(key) or "")
     meta["updatedAt"] = now_ms()
     write_meta(path, meta)
-    return profile_record(path)
+    new_name = updates.get("name")
+    if new_name is None or safe_name(str(new_name)) == path.name:
+        return profile_record(path)
+
+    target = profile_dir(str(new_name))
+    if target.exists():
+        raise ValueError(f"Profile name already exists: {target.name}")
+    cleanup_profile_locks(path.name)
+    move_profile_with_retry(path, target)
+    return profile_record(target)
 
 
 def delete_profile(name: str) -> dict:

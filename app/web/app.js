@@ -222,14 +222,20 @@ function renderQuickLinks() {
 
 function filteredProfiles() {
   const query = state.search.trim().toLowerCase();
-  return state.profiles.filter((profile) => {
-    if (state.status && profile.status !== state.status) return false;
-    if (!query) return true;
-    return [profile.name, profile.email, profile.note, profile.dir, profile.officialAuth?.email]
-      .join(" ")
-      .toLowerCase()
-      .includes(query);
-  });
+  return state.profiles
+    .filter((profile) => {
+      if (state.status && profile.status !== state.status) return false;
+      if (!query) return true;
+      return [profile.name, profile.email, profile.note, profile.dir, profile.officialAuth?.email]
+        .join(" ")
+        .toLowerCase()
+        .includes(query);
+    })
+    .sort((a, b) => {
+      const createdDiff = Number(b.createdAt || 0) - Number(a.createdAt || 0);
+      if (createdDiff !== 0) return createdDiff;
+      return String(b.name).localeCompare(String(a.name), "zh-CN", { numeric: true });
+    });
 }
 
 function render() {
@@ -275,7 +281,7 @@ function profileRow(profile) {
   return `
     <tr data-name="${escapeAttr(profile.name)}">
       <td>
-        <div class="profile-name">${escapeHtml(profile.name)}</div>
+        <input class="inline-input profile-name-input js-profile-name" value="${escapeAttr(profile.name)}" />
         <div class="path" title="${escapeAttr(profile.dir)}">${escapeHtml(profile.dir)}</div>
       </td>
       <td>
@@ -360,6 +366,7 @@ async function openProfile(name, url = currentOpenUrl()) {
 async function saveProfile(row) {
   const name = row.dataset.name;
   const updates = {
+    name: row.querySelector(".js-profile-name").value,
     email: row.querySelector(".js-email").value,
     status: row.querySelector(".js-status").value,
     note: row.querySelector(".js-note").value,
@@ -368,9 +375,10 @@ async function saveProfile(row) {
     method: "PATCH",
     body: JSON.stringify(updates),
   });
+  removeProfile(name);
   upsertProfile(payload.profile);
   render();
-  toast(`已保存 ${name}`);
+  toast(`已保存 ${payload.profile.name}`);
 }
 
 async function copyText(value, successMessage = "已复制") {
@@ -493,6 +501,7 @@ function upsertProfile(profile) {
   const index = state.profiles.findIndex((item) => item.name === profile.name);
   if (index >= 0) state.profiles[index] = profile;
   else state.profiles.push(profile);
+  state.profiles.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
 }
 
 function removeProfile(name) {
