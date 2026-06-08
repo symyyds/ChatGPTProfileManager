@@ -31,6 +31,7 @@ WEB_ROOT = APP_DIR / "web"
 META_FILE = ".profile-meta.json"
 DEFAULT_URL = "https://chatgpt.com"
 AUTH_ISSUER = "https://auth.openai.com"
+CODEX_AUTHORIZATION_ENDPOINT = f"{AUTH_ISSUER}/oauth/authorize"
 AUTH_DISCOVERY_URL = f"{AUTH_ISSUER}/.well-known/openid-configuration"
 CODEX_CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann"
 CODEX_SCOPES = "openid profile email offline_access api.connectors.read api.connectors.invoke"
@@ -521,7 +522,7 @@ def oauth_metadata() -> dict:
         return AUTH_CONFIG
 
     fallback = {
-        "authorization_endpoint": f"{AUTH_ISSUER}/authorize",
+        "authorization_endpoint": CODEX_AUTHORIZATION_ENDPOINT,
         "token_endpoint": "https://auth0.openai.com/oauth/token",
     }
     try:
@@ -529,7 +530,7 @@ def oauth_metadata() -> dict:
         with urllib.request.urlopen(request, timeout=12) as response:
             payload = json.loads(response.read().decode("utf-8"))
         AUTH_CONFIG = {
-            "authorization_endpoint": payload.get("authorization_endpoint") or fallback["authorization_endpoint"],
+            "authorization_endpoint": CODEX_AUTHORIZATION_ENDPOINT,
             "token_endpoint": payload.get("token_endpoint") or fallback["token_endpoint"],
         }
     except Exception:
