@@ -342,6 +342,7 @@ def delete_profile(name: str) -> dict:
     path = profile_dir(name)
     if not path.exists():
         raise FileNotFoundError(name)
+    cleanup_profile_locks(path.name)
     DELETED_ROOT.mkdir(parents=True, exist_ok=True)
     stamp = time.strftime("%Y%m%d-%H%M%S")
     target = DELETED_ROOT / f"{path.name}-{stamp}"
@@ -349,8 +350,81 @@ def delete_profile(name: str) -> dict:
     while target.exists():
         target = DELETED_ROOT / f"{path.name}-{stamp}-{suffix}"
         suffix += 1
-    shutil.move(str(path), str(target))
+    move_profile_with_retry(path, target)
     return {"name": path.name, "deletedTo": str(target)}
+
+
+def cleanup_profile_locks(name: str) -> None:
+    terminate_login_process(name)
+    terminate_profile_chrome(name)
+    time.sleep(0.2)
+
+
+def terminate_login_process(name: str) -> None:
+    path = profile_dir(name)
+    record = LOGIN_PROCS.pop(path.name, None)
+    if not record:
+        return
+    proc = record.get("process")
+    if proc and proc.poll() is None:
+        try:
+            proc.terminate()
+            proc.wait(timeout=2)
+        except Exception:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+    close_login_handles(record)
+
+
+def close_login_handles(record: dict) -> None:
+    for key in ("stdout", "stderr"):
+        try:
+            handle = record.get(key)
+            if handle:
+                handle.close()
+        except Exception:
+            pass
+
+
+def terminate_profile_chrome(name: str) -> None:
+    if os.name != "nt":
+        return
+    path = profile_dir(name)
+    marker = f"--user-data-dir={path}".lower()
+    ps_script = f"""
+$marker = {json.dumps(marker)}
+Get-CimInstance Win32_Process -Filter "name = 'chrome.exe'" |
+  Where-Object {{ ($_.CommandLine -as [string]).ToLower().Contains($marker) }} |
+  ForEach-Object {{ Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }}
+"""
+    try:
+        subprocess.run(
+            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_script],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=5,
+        )
+    except Exception:
+        pass
+
+
+def move_profile_with_retry(path: Path, target: Path) -> None:
+    last_error: Exception | None = None
+    for _ in range(8):
+        try:
+            shutil.move(str(path), str(target))
+            return
+        except PermissionError as exc:
+            last_error = exc
+            time.sleep(0.35)
+        except OSError as exc:
+            last_error = exc
+            if getattr(exc, "winerror", None) != 32:
+                raise
+            time.sleep(0.35)
+    raise RuntimeError(f"Profile is still in use; close its Chrome window and retry. Last error: {last_error}")
 
 
 def codex_executable() -> str:
@@ -377,11 +451,7 @@ def clean_finished_login(name: str) -> None:
         return
     record = LOGIN_PROCS.pop(name, None)
     if record:
-        for key in ("stdout", "stderr"):
-            try:
-                record.get(key).close()
-            except Exception:
-                pass
+        close_login_handles(record)
 
 
 def parse_login_output(text: str) -> dict:
@@ -500,15 +570,7 @@ def official_login_status(name: str) -> dict:
 
 def stop_official_login(name: str) -> dict:
     path = profile_dir(name)
-    record = LOGIN_PROCS.pop(path.name, None)
-    if record and record["process"].poll() is None:
-        record["process"].terminate()
-    if record:
-        for key in ("stdout", "stderr"):
-            try:
-                record.get(key).close()
-            except Exception:
-                pass
+    terminate_login_process(path.name)
     return official_login_status(path.name)
 
 
