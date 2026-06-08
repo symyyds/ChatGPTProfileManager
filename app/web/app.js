@@ -508,6 +508,15 @@ function removeProfile(name) {
   state.profiles = state.profiles.filter((item) => item.name !== name);
 }
 
+function confirmDeleteProfile(profile) {
+  const name = profile?.name || "";
+  if (profile?.officialAuth?.ready) {
+    const email = profile.officialAuth.email ? `\n账号邮箱：${profile.officialAuth.email}` : "";
+    return confirm(`该账号已经生成好 JSON。${email}\n\n是否确认删除账号“${name}”？\n\n删除后会移动到 deleted-profiles 备份区。`);
+  }
+  return confirm(`该账号还没有生成 JSON。\n\n是否仍然确认删除账号“${name}”？\n\n删除后会移动到 deleted-profiles 备份区。`);
+}
+
 async function suggestName() {
   const prefix = els.prefix.value || "team";
   const payload = await api(`/api/next-name?prefix=${encodeURIComponent(prefix)}&padding=2`);
@@ -711,7 +720,8 @@ els.body.addEventListener("click", async (event) => {
     } else if (event.target.closest(".js-save")) {
       await saveProfile(row);
     } else if (event.target.closest(".js-delete")) {
-      if (!confirm(`删除 ${name}？\n\n会移动到 deleted-profiles 备份区。`)) return;
+      const profile = state.profiles.find((item) => item.name === name);
+      if (!confirmDeleteProfile(profile)) return;
       await api(`/api/profiles/${encodeURIComponent(name)}`, { method: "DELETE" });
       removeProfile(name);
       render();
