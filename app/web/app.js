@@ -288,6 +288,10 @@ function profileRow(profile) {
         <div class="auth-state ${authClass}">
           <strong>${escapeHtml(authTitle)}</strong>
           <small title="${escapeAttr(officialAuth.path || "")}">${escapeHtml(authMeta || "-")}</small>
+          <div class="json-inline-actions">
+            <button class="small-action js-view-json" type="button" ${officialAuth.ready ? "" : "disabled"}>查看JSON</button>
+            <button class="small-action js-download-json" type="button" ${officialAuth.ready ? "" : "disabled"}>下载JSON</button>
+          </div>
         </div>
       </td>
       <td>
@@ -689,6 +693,10 @@ els.body.addEventListener("click", async (event) => {
       await openProfile(name, linkForKind("official").url);
     } else if (event.target.closest(".js-open-device-auth")) {
       await openProfile(name, DEVICE_AUTH_URL);
+    } else if (event.target.closest(".js-view-json")) {
+      await showAuthJson(name);
+    } else if (event.target.closest(".js-download-json")) {
+      downloadAuthJson(name);
     } else if (event.target.closest(".js-copy-email")) {
       await copyText(row.querySelector(".js-email").value, "邮箱已复制");
     } else if (event.target.closest(".js-save")) {

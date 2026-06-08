@@ -465,7 +465,7 @@ td:nth-child(7) {
 
 .auth-state {
   display: grid;
-  gap: 2px;
+  gap: 4px;
   font-size: 12px;
 }
 
@@ -492,6 +492,19 @@ td:nth-child(7) {
 .auth-state small {
   color: var(--muted);
   font-size: 11px;
+}
+
+.json-inline-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 3px;
+}
+
+.json-inline-actions .small-action {
+  min-height: 28px;
+  height: 28px;
+  padding: 0 8px;
 }
 
 .actions .danger {
