@@ -943,6 +943,12 @@ def normalize_url(url: str) -> str:
     return value
 
 
+def content_disposition_attachment(filename: str) -> str:
+    fallback = re.sub(r'[^A-Za-z0-9._-]+', '_', filename).strip('._') or 'download.json'
+    quoted = urllib.parse.quote(filename, safe='')
+    return f'attachment; filename="{fallback}"; filename*=UTF-8\'\'{quoted}'
+
+
 def next_profile_name(prefix: str = "team", padding: int = 2) -> str:
     prefix = safe_name(prefix)
     pattern = re.compile(rf"^{re.escape(prefix)}(\d+)$", re.IGNORECASE)
@@ -1113,7 +1119,7 @@ class Handler(BaseHTTPRequestHandler):
         data = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+        self.send_header("Content-Disposition", content_disposition_attachment(filename))
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
@@ -1122,7 +1128,7 @@ class Handler(BaseHTTPRequestHandler):
         data = path.read_bytes()
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+        self.send_header("Content-Disposition", content_disposition_attachment(filename))
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
